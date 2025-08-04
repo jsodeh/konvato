@@ -1,0 +1,347 @@
+# Kubernetes deployment for DigitalOcean
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: betslip-converter
+  labels:
+    name: betslip-converter
+
+---
+# ConfigMap for application configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: betslip-config
+  namespace: betslip-converter
+data:
+  NODE_ENV: "production"
+  BROWSER_HEADLESS: "true"
+  BROWSER_TIMEOUT: "30000"
+  USE_PARALLEL_PROCESSING: "true"
+  MAX_CONCURRENT_BROWSERS: "3"
+  MAX_MEMORY_MB: "2048"
+  CORS_ORIGIN: "https://your-domain.com"
+  LOG_LEVEL: "info"
+  ENABLE_METRICS: "true"
+  METRICS_PORT: "9090"
+
+---
+# Secret for sensitive data
+apiVersion: v1
+kind: Secret
+metadata:
+  name: betslip-secrets
+  namespace: betslip-converter
+type: Opaque
+data:
+  # Base64 encoded values - replace with actual encoded secrets
+  openai-api-key: eW91ci1vcGVuYWktYXBpLWtleQ==  # your-openai-api-key
+  jwt-secret: eW91ci1qd3Qtc2VjcmV0LWNoYW5nZS1pbi1wcm9kdWN0aW9u  # your-jwt-secret-change-in-production
+  mongodb-uri: bW9uZ29kYjovL3VzZXJuYW1lOnBhc3N3b3JkQG1hbmFnZWQtZGItaG9zdDoyNzAxNy9iZXRzbGlwX2NvbnZlcnRlcg==  # mongodb://username:password@managed-db-host:27017/betslip_converter
+  redis-url: cmVkaXM6Ly9tYW5hZ2VkLXJlZGlzLWhvc3Q6MjUwNjE=  # redis://managed-redis-host:25061
+
+---
+# Deployment for the main application
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: betslip-converter
+  namespace: betslip-converter
+  labels:
+    app: betslip-converter
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: betslip-converter
+  template:
+    metadata:
+      labels:
+        app: betslip-converter
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/api/metrics"
+    spec:
+      containers:
+      - name: betslip-app
+        image: registry.digitalocean.com/your-registry/betslip-converter:latest
+        ports:
+        - containerPort: 5000
+          name: http
+        - containerPort: 9090
+          name: metrics
+        env:
+        - name: PORT
+          value: "5000"
+        envFrom:
+        - configMapRef:
+            name: betslip-config
+        - secretRef:
+            name: betslip-secrets
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 5000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /api/health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 10
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: logs
+        emptyDir: {}
+      securityContext:
+        fsGroup: 1001
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - betslip-converter
+              topologyKey: kubernetes.io/hostname
+
+---
+# Service for the application
+apiVersion: v1
+kind: Service
+metadata:
+  name: betslip-converter-service
+  namespace: betslip-converter
+  labels:
+    app: betslip-converter
+  annotations:
+    service.beta.kubernetes.io/do-loadbalancer-name: "betslip-converter-lb"
+    service.beta.kubernetes.io/do-loadbalancer-protocol: "http"
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-path: "/api/health"
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-protocol: "http"
+    service.beta.kubernetes.io/do-loadbalancer-healthcheck-port: "5000"
+spec:
+  type: LoadBalancer
+  selector:
+    app: betslip-converter
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 5000
+  - name: https
+    protocol: TCP
+    port: 443
+    targetPort: 5000
+  sessionAffinity: None
+
+---
+# Service for metrics (internal)
+apiVersion: v1
+kind: Service
+metadata:
+  name: betslip-converter-metrics
+  namespace: betslip-converter
+  labels:
+    app: betslip-converter
+    component: metrics
+spec:
+  type: ClusterIP
+  selector:
+    app: betslip-converter
+  ports:
+  - name: metrics
+    protocol: TCP
+    port: 9090
+    targetPort: 9090
+
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: betslip-converter-hpa
+  namespace: betslip-converter
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: betslip-converter
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: betslip-converter-pdb
+  namespace: betslip-converter
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: betslip-converter
+
+---
+# Network Policy for security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: betslip-converter-netpol
+  namespace: betslip-converter
+spec:
+  podSelector:
+    matchLabels:
+      app: betslip-converter
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 5000
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090
+  egress:
+  - {} # Allow all egress traffic
+
+---
+# Ingress for custom domain (optional)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: betslip-converter-ingress
+  namespace: betslip-converter
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+spec:
+  tls:
+  - hosts:
+    - your-domain.com
+    - www.your-domain.com
+    secretName: betslip-converter-tls
+  rules:
+  - host: your-domain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: betslip-converter-service
+            port:
+              number: 80
+  - host: www.your-domain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: betslip-converter-service
+            port:
+              number: 80
+
+---
+# ServiceMonitor for Prometheus (if using Prometheus Operator)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: betslip-converter-metrics
+  namespace: betslip-converter
+  labels:
+    app: betslip-converter
+spec:
+  selector:
+    matchLabels:
+      app: betslip-converter
+      component: metrics
+  endpoints:
+  - port: metrics
+    path: /api/metrics
+    interval: 30s
+    scrapeTimeout: 10s

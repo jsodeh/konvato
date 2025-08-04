@@ -1,0 +1,9 @@
+browser-use
+playwright
+openai
+anthropic
+python-dotenv
+pydantic
+pytest
+pytest-asyncio
+psutil
