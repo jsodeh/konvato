@@ -7,3 +7,5 @@ pydantic
 pytest
 pytest-asyncio
 psutil
+langchain_openai
+langchain_anthropic

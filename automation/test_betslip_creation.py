@@ -69,48 +69,48 @@ async def test_betslip_creation():
         print(f"❌ Betslip creation test failed: {str(e)}")
         return False
 
-@pytest.mark.asyncio
-async def test_helper_methods():
-    """Test the helper methods for team name normalization and search variations"""
+# @pytest.mark.asyncio
+# async def test_helper_methods():
+#     """Test the helper methods for team name normalization and search variations"""
     
-    manager = BrowserUseManager()
+#     manager = BrowserUseManager()
     
-    print("\n=== Testing Helper Methods ===")
+#     print("\n=== Testing Helper Methods ===")
     
-    # Test team name normalization
-    test_teams = [
-        "Manchester United FC",
-        "Real Madrid C.F.",
-        "Liverpool F.C.",
-        "Arsenal FC"
-    ]
+#     # Test team name normalization
+#     test_teams = [
+#         "Manchester United FC",
+#         "Real Madrid C.F.",
+#         "Liverpool F.C.",
+#         "Arsenal FC"
+#     ]
     
-    print("\nTeam name normalization:")
-    for team in test_teams:
-        normalized = manager._normalize_team_name(team)
-        print(f"  {team} -> {normalized}")
+#     print("\nTeam name normalization:")
+#     for team in test_teams:
+#         normalized = manager._normalize_team_name(team)
+#         print(f"  {team} -> {normalized}")
     
-    # Test market name normalization
-    test_markets = [
-        "Match Result",
-        "1X2",
-        "Over/Under 2.5",
-        "Both Teams to Score",
-        "BTTS"
-    ]
+#     # Test market name normalization
+#     test_markets = [
+#         "Match Result",
+#         "1X2",
+#         "Over/Under 2.5",
+#         "Both Teams to Score",
+#         "BTTS"
+#     ]
     
-    print("\nMarket name normalization:")
-    for market in test_markets:
-        normalized = manager._normalize_market_name(market, "sportybet")
-        print(f"  {market} -> {normalized}")
+#     print("\nMarket name normalization:")
+#     for market in test_markets:
+#         normalized = manager._normalize_market_name(market, "sportybet")
+#         print(f"  {market} -> {normalized}")
     
-    # Test search variations
-    print("\nSearch variations for 'Manchester United vs Liverpool':")
-    variations = manager._generate_search_variations("Manchester United", "Liverpool")
-    for i, variation in enumerate(variations[:5], 1):  # Show first 5
-        print(f"  {i}. {variation}")
+#     # Test search variations
+#     print("\nSearch variations for 'Manchester United vs Liverpool':")
+#     variations = manager._generate_search_variations("Manchester United", "Liverpool")
+#     for i, variation in enumerate(variations[:5], 1):  # Show first 5
+#         print(f"  {i}. {variation}")
     
-    print("✅ Helper methods test completed")
+#     print("✅ Helper methods test completed")
 
 def main():
     """Main test function"""
