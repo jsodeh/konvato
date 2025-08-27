@@ -1,0 +1,26 @@
+# Minimal Dockerfile for Python Automation Service
+FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
+
+WORKDIR /app
+
+# Copy Python requirements and install dependencies
+COPY automation/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy Python automation code
+COPY automation/ .
+
+# Create non-root user for security
+RUN useradd -m -u 1001 automation
+RUN chown -R automation:automation /app
+USER automation
+
+# Expose port for internal communication
+EXPOSE 10000
+
+# Health check for Render
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:10000/health')" || exit 1
+
+# Start the automation service
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10000"]
