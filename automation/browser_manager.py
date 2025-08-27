@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from browser_use import Agent
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
+from langchain_groq import ChatGroq
 from models import Selection, ConversionResult, BookmakerConfig, validate_betslip_code
 from bookmaker_adapters import get_bookmaker_adapter, BookmakerAdapter
 from browser_config import BrowserConfig, LLMConfig
@@ -22,29 +23,41 @@ load_dotenv()
 class BrowserUseManager:
     """Manager class for browser-use automation"""
     
-    def __init__(self, openai_api_key: str = None, anthropic_api_key: str = None):
+    def __init__(self, openai_api_key: str = None, anthropic_api_key: str = None, groq_api_key: str = None):
         self.openai_api_key = openai_api_key or os.getenv('OPENAI_API_KEY')
         self.anthropic_api_key = anthropic_api_key or os.getenv('ANTHROPIC_API_KEY')
+        self.groq_api_key = groq_api_key or os.getenv('GROQ_API_KEY')
         
-        # Determine which LLM provider to use
-        provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+        # Determine which LLM provider to use, prioritizing Groq
+        provider = os.getenv('LLM_PROVIDER', 'groq').lower()
         
-        if provider == 'anthropic':
+        llm_config = LLMConfig.get_extraction_config()
+
+        if provider == 'groq':
+            if not self.groq_api_key:
+                raise ValueError("GROQ_API_KEY is required when LLM_PROVIDER=groq")
+            # Recommended model for Groq with JSON mode support
+            llm_config['model_name'] = 'llama3-70b-8192'
+            self.llm = ChatGroq(
+                api_key=self.groq_api_key,
+                **llm_config
+            )
+        elif provider == 'anthropic':
             if not self.anthropic_api_key:
                 raise ValueError("ANTHROPIC_API_KEY is required when LLM_PROVIDER=anthropic")
-            llm_config = LLMConfig.get_extraction_config()
             self.llm = ChatAnthropic(
                 api_key=self.anthropic_api_key,
                 **llm_config
             )
-        else:  # Default to OpenAI
+        elif provider == 'openai':
             if not self.openai_api_key:
                 raise ValueError("OPENAI_API_KEY is required when LLM_PROVIDER=openai")
-            llm_config = LLMConfig.get_extraction_config()
             self.llm = ChatOpenAI(
                 api_key=self.openai_api_key,
                 **llm_config
             )
+        else:
+            raise ValueError(f"Unsupported LLM_PROVIDER: {provider}. Choose from 'groq', 'openai', 'anthropic'.")
     
     def _get_bookmaker_adapter(self, bookmaker: str) -> BookmakerAdapter:
         """Get adapter for a specific bookmaker"""
@@ -436,12 +449,17 @@ class BrowserUseManager:
                 
                 # Create and run the browser-use agent with optimized config
                 creation_llm_config = LLMConfig.get_creation_config()
-                provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+                provider = os.getenv('LLM_PROVIDER', 'groq').lower()
                 
-                if provider == 'anthropic':
+                if provider == 'groq':
+                    creation_llm_config['model_name'] = 'llama3-70b-8192'
+                    creation_llm = ChatGroq(api_key=self.groq_api_key, **creation_llm_config)
+                elif provider == 'anthropic':
                     creation_llm = ChatAnthropic(api_key=self.anthropic_api_key, **creation_llm_config)
-                else:
+                elif provider == 'openai':
                     creation_llm = ChatOpenAI(api_key=self.openai_api_key, **creation_llm_config)
+                else:
+                    raise ValueError(f"Unsupported LLM_PROVIDER: {provider}")
                 
                 agent = Agent(
                     task=task_prompt,

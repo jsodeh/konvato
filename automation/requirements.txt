@@ -2,8 +2,11 @@ browser-use
 playwright
 openai
 anthropic
+langchain-groq
 python-dotenv
 pydantic
 pytest
 pytest-asyncio
 psutil
+fastapi
+uvicorn
