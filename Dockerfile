@@ -6,18 +6,33 @@ FROM python:3.11-slim as python-base
 # Install system dependencies for Playwright
 RUN apt-get update && apt-get install -y \
     wget \
+    curl \
     gnupg \
     ca-certificates \
     fonts-liberation \
+    fonts-noto-color-emoji \
+    fonts-noto-cjk \
+    fonts-freefont-ttf \
+    fontconfig \
     libasound2 \
     libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libatspi2.0-0 \
     libdrm2 \
     libgtk-3-0 \
     libnspr4 \
     libnss3 \
+    libwayland-client0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxkbcommon0 \
+    libxrandr2 \
     libxss1 \
     libxtst6 \
     xdg-utils \
+    libu2f-udev \
+    libvulkan1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/automation
@@ -26,9 +41,8 @@ WORKDIR /app/automation
 COPY automation/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright browsers
-RUN playwright install chromium
-RUN playwright install-deps chromium
+# Install Playwright browsers with fallback for dependencies
+RUN playwright install chromium --with-deps || playwright install chromium
 
 # Copy Python automation code
 COPY automation/ .
