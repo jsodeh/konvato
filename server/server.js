@@ -24,8 +24,12 @@ const validateConfiguration = () => {
         warnings.push('No LLM API key found. At least one of GROQ_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY must be set.');
     }
     
+    // Set default automation service URL if not provided
     if (!process.env.AUTOMATION_SERVICE_URL) {
-        warnings.push('AUTOMATION_SERVICE_URL not set - the server cannot connect to the automation service.');
+        process.env.AUTOMATION_SERVICE_URL = process.env.NODE_ENV === 'production' 
+            ? 'https://konvato-automation.onrender.com' 
+            : 'http://localhost:10000';
+        console.log(`AUTOMATION_SERVICE_URL not set, using default: ${process.env.AUTOMATION_SERVICE_URL}`);
     }
     
     if (warnings.length > 0) {
@@ -49,7 +53,7 @@ initializeCache().catch(error => {
 // Middleware
 app.use(cors({
     origin: process.env.CORS_ORIGIN || process.env.NODE_ENV === 'production' 
-        ? [process.env.CORS_ORIGIN, 'https://konvato-client.onrender.com']
+        ? [process.env.CORS_ORIGIN, 'https://konvato-client.onrender.com'].filter(Boolean)
         : ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000'],
     credentials: true
 }));

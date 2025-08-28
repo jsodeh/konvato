@@ -26,10 +26,7 @@ services:
           name: konvato-redis
           property: connectionString
       - key: AUTOMATION_SERVICE_URL
-        fromService:
-          type: pserv
-          name: konvato-automation
-          property: url
+        sync: false
       - key: JWT_SECRET
         generateValue: true # Let Render generate a strong secret
       - key: GROQ_API_KEY
@@ -41,10 +38,7 @@ services:
       - key: LLM_PROVIDER
         value: groq
       - key: CORS_ORIGIN
-        fromService:
-          type: web
-          name: konvato-client
-          property: url
+        sync: false
 
   # --- Automation: Python Private Service (Docker) ---
   - type: pserv # Private Service

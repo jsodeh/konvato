@@ -2,16 +2,46 @@
  * Configuration file for API endpoints and environment variables
  */
 
+// Helper function to detect environment
+const getEnvironment = () => {
+  const hostname = window.location.hostname;
+  
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'development';
+  } else if (hostname.includes('onrender.com')) {
+    return 'production';
+  } else {
+    return 'unknown';
+  }
+};
+
+// Helper function to get API base URL
+const getApiBaseUrl = () => {
+  const env = getEnvironment();
+  
+  switch (env) {
+    case 'development':
+      return 'http://localhost:5000';
+    case 'production':
+      return 'https://konvato-server.onrender.com';
+    default:
+      // Fallback: try to infer from current hostname
+      if (window.location.hostname.includes('konvato-client')) {
+        return 'https://konvato-server.onrender.com';
+      }
+      return 'http://localhost:5000'; // Ultimate fallback
+  }
+};
+
 // Configuration object
 window.Config = {
-  // API base URL - will be set during build time
-  API_BASE_URL: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? 'http://localhost:5000'  // Local development
-    : 'https://konvato-server.onrender.com',  // Production - backend service URL
+  // API base URL - dynamically determined
+  API_BASE_URL: getApiBaseUrl(),
   
   // Environment detection
-  isDevelopment: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1',
-  isProduction: window.location.hostname.includes('onrender.com'),
+  environment: getEnvironment(),
+  isDevelopment: getEnvironment() === 'development',
+  isProduction: getEnvironment() === 'production',
   
   // API endpoints
   endpoints: {
