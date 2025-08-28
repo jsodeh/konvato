@@ -48,7 +48,10 @@ initializeCache().catch(error => {
 
 // Middleware
 app.use(cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000'
+    origin: process.env.CORS_ORIGIN || process.env.NODE_ENV === 'production' 
+        ? [process.env.CORS_ORIGIN, 'https://konvato-client.onrender.com']
+        : ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000'],
+    credentials: true
 }));
 app.use(express.json());
 app.use(metricsMiddleware);
@@ -92,6 +95,49 @@ app.get('/health', (req, res) => {
         status: 'OK', 
         message: 'Betslip Converter API is running',
         timestamp: new Date().toISOString(),
+    });
+});
+
+app.get('/api/bookmakers', (req, res) => {
+    // Return list of supported bookmakers
+    const bookmakers = [
+        { id: 'bet9ja', name: 'Bet9ja', baseUrl: 'https://bet9ja.com', supported: true },
+        { id: 'sportybet', name: 'SportyBet', baseUrl: 'https://sportybet.com', supported: true },
+        { id: 'betway', name: 'Betway', baseUrl: 'https://betway.com', supported: true },
+        { id: 'bet365', name: 'Bet365', baseUrl: 'https://bet365.com', supported: true },
+        { id: '1xbet', name: '1xBet', baseUrl: 'https://1xbet.com', supported: true },
+        { id: 'melbet', name: 'MelBet', baseUrl: 'https://melbet.com', supported: true }
+    ];
+    
+    res.json({
+        success: true,
+        bookmakers: bookmakers
+    });
+});
+
+app.get('/api/compliance/disclaimers', (req, res) => {
+    // Return compliance disclaimers
+    const disclaimers = [
+        {
+            type: 'educational',
+            title: 'Educational Use Only',
+            content: 'This tool is for educational and research purposes only. Users are responsible for complying with local gambling laws and bookmaker terms of service.'
+        },
+        {
+            type: 'responsibility',
+            title: 'User Responsibility',
+            content: 'By using this service, you acknowledge that you are solely responsible for your betting activities and any consequences thereof.'
+        },
+        {
+            type: 'accuracy',
+            title: 'No Guarantees',
+            content: 'While we strive for accuracy, we cannot guarantee the correctness of converted betslips. Always verify odds and selections before placing bets.'
+        }
+    ];
+    
+    res.json({
+        success: true,
+        disclaimers: disclaimers
     });
 });
 
